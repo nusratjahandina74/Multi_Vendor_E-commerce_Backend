@@ -1,31 +1,30 @@
 require('dotenv').config();
-const express = require('express')
-const mongoose = require('mongoose')
-const cors = require('cors')
-const cookieParser = require('cookie-parser')
-const authRoutes = require('./routes/auth')
-const app = express()
+const express = require('express');
+const cors = require('cors');
+const cookieParser = require('cookie-parser');
+const authRoutes = require('./routes/auth');
+const dbConfig = require('./config/dbConfig');
+const swaggerDocs = require('./swagger');
 
-app.use(express.json({ limit: '10kb' }))
+const app = express();
+
+// Middleware
+app.use(express.json({ limit: '10kb' }));
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http:localhost:5173',
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
     credentials: true
-}))
-app.use(cookieParser())
+}));
+app.use(cookieParser());
 
-//Routes
-app.use('/api/v1/auth/', authRoutes)
+// Database Connection
+dbConfig();
 
-//MongoDB Connection
-mongoose.connect(process.env.MONGODB_URL)
-    .then(() => {
-        console.log("Database Connected");
-    }).catch((err) => {
-        console.log("MongoDB Connection Error: ", err);
-    })
+// Routes
+app.use('/api/v1/auth', authRoutes);
 
-//Server
-const port = process.env.PORT || 5000
-app.listen(port, () => {
-    console.log(`Server Running on port ${port}`);
-})
+// Server Setup
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+    console.log(`Server Running on port ${PORT}`);
+    swaggerDocs(app, PORT);
+});

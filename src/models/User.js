@@ -6,7 +6,7 @@ const userSchema = new Schema({
         type: String,
         required: [true, "Name is required"],
         trim: true,
-        minLenght: 2
+        minLength: 2
     },
     email: {
         type: String,
@@ -23,7 +23,7 @@ const userSchema = new Schema({
     password: {
         type: String,
         required: [true, "Password is required"],
-        minLenght: 8,
+        minLength: 8,
         select: false
     },
     role: {
@@ -42,6 +42,9 @@ const userSchema = new Schema({
             default: Date.now
         }
     }],
+    expiresAt: {
+        type: Date
+    },
     createdAt: {
         type: Date,
         default: Date.now
@@ -52,9 +55,13 @@ const userSchema = new Schema({
 //Password Hash
 userSchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next()
-    const salt = await bcrypt.genSalt(10)
-    this.password = await bcrypt.hash(this.password, salt)
-    next()
+    try {
+        const salt = await bcrypt.genSalt(10)
+        this.password = await bcrypt.hash(this.password, salt)
+        next()
+    } catch (error) {
+        next(error)
+    }
 })
 
 //Compare Password
