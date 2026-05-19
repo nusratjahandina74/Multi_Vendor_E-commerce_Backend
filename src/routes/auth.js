@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { registrationController, loginController, refreshToken } = require('../controllers/authController');
 const { verifyEmail } = require('../controllers/verifyEmail');
+// const { protect, restrictTo } = require('../middlewares/authMiddleware');
 
 /**
  * @swagger
@@ -206,6 +207,7 @@ router.get('/verify-email', verifyEmail);
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post('/refreshToken', refreshToken);
+// router.get('/admin/dashboard', protect, restrictTo('admin'));
 
 module.exports = router;
 
