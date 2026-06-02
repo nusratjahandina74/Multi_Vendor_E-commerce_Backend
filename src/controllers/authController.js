@@ -4,7 +4,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken')
 const { validationResult } = require('express-validator')
 const nodemailer = require('nodemailer')
-const { v4: uuidv4 } = require('uuid')
+const { v4: uuidv4 } = require('uuid');
+const { success } = require('zod');
 exports.registrationController = async (req, res) => {
     try {
         const { name, email, password, phone, role } = req.body
@@ -223,5 +224,75 @@ exports.refreshToken = async (req, res) => {
             success: false,
             message: "Internal server error"
         })
+    }
+}
+exports.logout = async (req, res) => {
+    try {
+        const refreshToken = req.cookies.refreshToken
+        if(!refreshToken){
+            return res.status(204).send()
+        }
+        // Find User
+        const user = await User.findOne({
+            refreshToken: { $elemMatch: { token: refreshToken } }
+        })
+        if(user){
+            user.refreshToken = user.refreshToken.filter(rt => rt.token !== refreshToken)
+            await user.save()
+        }
+        res.clearCookie('refreshToken', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV == 'production',
+            sameSite: 'strict'
+        })
+        res.status(200).json({
+            success: true,
+            message: 'Logged out Successfully'
+        })
+    } catch (error) {
+        console.error("Logout Error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server Error during logout"
+        })
+    }
+}
+exports.logoutAll = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id)
+        if(!user){
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            })
+        }
+        user.refreshToken  = []
+        await user.save()
+        res.clearCookie('refreshToken', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV == 'production',
+            sameSite: 'strict'
+        })
+        res.status(200).json({
+            success: true,
+            message: 'Logged out from all devices'
+        })
+    } catch (error) {
+        console.error("Logout all devices Error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server Error during logout from all devices"
+        })
+    }
+}
+exports.registerVendor = async (req, res) => {
+    try {
+        const validateData = req.body
+    } catch (error) {
+       console.error("Register Vendor Error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Internal Server Error"
+        }) 
     }
 }

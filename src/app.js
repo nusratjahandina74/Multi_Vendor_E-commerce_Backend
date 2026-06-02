@@ -6,6 +6,7 @@ const cookieParser = require('cookie-parser');
 const authRoutes = require('./routes/auth');
 const dbConfig = require('./config/dbConfig');
 const swaggerSpecs = require('./config/swagger');
+const { apiLimiter } = require('./middlewares/rateLimiterMiddleware');
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use(cookieParser());
 dbConfig();
 
 // Routes
+app.use('/api/v1', apiLimiter);
 app.use('/api/v1/auth', authRoutes);
 
 // Server Setup

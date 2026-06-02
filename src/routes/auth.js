@@ -1,12 +1,27 @@
 const express = require('express');
 const router = express.Router();
-const { registrationController, loginController, refreshToken } = require('../controllers/authController');
+const { 
+    registrationController, 
+    loginController, 
+    refreshToken, 
+    logout, 
+    logoutAll 
+} = require('../controllers/authController');
 const { verifyEmail } = require('../controllers/verifyEmail');
-// const { protect, restrictTo } = require('../middlewares/authMiddleware');
+
+const validate = require('../middlewares/validateMiddleware');
+const { registrationSchema, loginSchema } = require('../validations/authValidation');
+const { registrationLimiter, loginLimiter, refreshLimiter } = require('../middlewares/rateLimiterMiddleware');
+const {protect} = require('../middlewares/authMiddleware'); 
 
 /**
  * @swagger
  * components:
+ *   securitySchemes:
+ *     bearerAuth:
+ *       type: http
+ *       scheme: bearer
+ *       bearerFormat: JWT
  *   schemas:
  *     RegisterInput:
  *       type: object
@@ -15,8 +30,8 @@ const { verifyEmail } = require('../controllers/verifyEmail');
  *         name: { type: string, example: John Doe }
  *         email: { type: string, format: email, example: john@example.com }
  *         password: { type: string, format: password, example: securePassword123 }
- *         phone: { type: string, example: "+1234567890" }
- *         role: { type: string, enum: [customer, vendor, admin], default: customer, example: customer }
+ *         phone: { type: string, example: "+8801712345678" }
+ *         role: { type: string, enum: [customer, vendor], default: customer, example: customer }
  *     
  *     RegisterResponse:
  *       type: object
@@ -53,12 +68,17 @@ const { verifyEmail } = require('../controllers/verifyEmail');
  *             role: { type: string, example: customer }
  *             isEmailVerified: { type: boolean, example: false }
  * 
- *     # ---- NEW SUBSYSTEM RESPONSE SCHEMAS ADDED FOR REFRESH ENGINE ----
  *     RefreshSuccessResponse:
  *       type: object
  *       properties:
  *         success: { type: boolean, example: true }
  *         accessToken: { type: string, example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.newAccessSignature..." }
+ * 
+ *     GenericSuccessResponse:
+ *       type: object
+ *       properties:
+ *         success: { type: boolean, example: true }
+ *         message: { type: string, example: Operation successful }
  * 
  *     ErrorResponse:
  *       type: object
@@ -93,7 +113,7 @@ const { verifyEmail } = require('../controllers/verifyEmail');
  *       500:
  *         description: Internal server error
  */
-router.post('/register', registrationController);
+router.post('/register', registrationLimiter, validate(registrationSchema), registrationController);
 
 /**
  * @swagger
@@ -126,7 +146,7 @@ router.post('/register', registrationController);
  *       500:
  *         description: Internal server error
  */
-router.post('/login', loginController);
+router.post('/login', loginLimiter, validate(loginSchema), loginController);
 
 /**
  * @swagger
@@ -140,7 +160,7 @@ router.post('/login', loginController);
  *         required: true
  *         schema:
  *           type: string
- *         description: Cryptographic token.
+ *         description: Cryptographic verification token.
  *         example: "abcdef1234567890verificationtoken"
  *       - in: query
  *         name: email
@@ -148,7 +168,7 @@ router.post('/login', loginController);
  *         schema:
  *           type: string
  *           format: email
- *         description: Target user validation account identity mapping checking rules.
+ *         description: Target user verification account identity mapping.
  *         example: "john@example.com"
  *     responses:
  *       302:
@@ -170,7 +190,7 @@ router.get('/verify-email', verifyEmail);
  * /api/v1/auth/refreshToken:
  *   post:
  *     summary: Regenerate New Access Token via Session Rotation Cookie
- *     description: Read incoming HttpOnly cookies structure silently, maps session tracking token against active model profile records, validates signature matrix and grants a short lived accessToken signature parameter.
+ *     description: Reads incoming HttpOnly cookie structure silently and grants a short lived accessToken signature.
  *     tags: [Authentication]
  *     parameters:
  *       - in: cookie
@@ -178,37 +198,75 @@ router.get('/verify-email', verifyEmail);
  *         required: true
  *         schema:
  *           type: string
- *         description: The session validation cookie tracking entity mapping profiles.
+ *         description: The session validation cookie tracking entity.
  *         example: "eyJhbGciOiJIUzI1NiIsInR5..."
  *     responses:
  *       200:
- *         description: Short-lived authentication credentials access granted token returned.
+ *         description: Short-lived authentication credentials access token returned.
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/RefreshSuccessResponse'
  *       400:
- *         description: No refresh token present inside application headers cookie space area configuration.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         description: No refresh token present inside application headers.
  *       403:
- *         description: Access Forbidden. Invalid token / expired structural token context mismatch data logic.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *         description: Access Forbidden. Invalid token / expired structural token.
  *       500:
- *         description: Internal server error execution trace logging errors failure.
+ *         description: Internal server error execution trace.
+ */
+router.post('/refreshToken', refreshLimiter, refreshToken);
+
+/**
+ * @swagger
+ * /api/v1/auth/logout:
+ *   post:
+ *     summary: Logout current device session
+ *     description: Clears the current refreshToken from cookie and removes it from user history in the database.
+ *     tags: [Authentication]
+ *     parameters:
+ *       - in: cookie
+ *         name: refreshToken
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Logged out Successfully.
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *               $ref: '#/components/schemas/GenericSuccessResponse'
+ *       204:
+ *         description: No active token session cookie detected.
+ *       500:
+ *         description: Server Error during logout.
  */
-router.post('/refreshToken', refreshToken);
-// router.get('/admin/dashboard', protect, restrictTo('admin'));
+router.post('/logout', logout);
+
+/**
+ * @swagger
+ * /api/v1/auth/logout-all:
+ *   post:
+ *     summary: Logout from all active devices and sessions
+ *     description: Flushes all tokens from user session storage database record. Requires a valid Access Token in Header.
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Logged out from all devices successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/GenericSuccessResponse'
+ *       401:
+ *         description: Unauthorized. Missing or invalid Bearer Access token.
+ *       404:
+ *         description: Active database target user profile record not found.
+ *       500:
+ *         description: Server Error during cascade flush logout.
+ */
+
+router.post('/logoutall', protect, logoutAll); 
 
 module.exports = router;
-
-
