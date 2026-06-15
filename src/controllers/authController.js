@@ -19,7 +19,7 @@ exports.registrationController = async (req, res) => {
         }
 
         //Check if user already exists
-        const existingUser = await User.findOne({ email })
+        const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(409).json({
                 success: false,
@@ -39,11 +39,11 @@ exports.registrationController = async (req, res) => {
         })
 
         //Save User
-        await user.save()
+        await user.save();
 
         //Create verification token
         const token = uuidv4()
-        await new VerificationToken({ userId: user._id, token }).save()
+        await new VerificationToken({ userId: user._id, token }).save();
 
         //Send Email
         const transporter = nodemailer.createTransport({
@@ -98,14 +98,14 @@ exports.loginController = async (req, res) => {
                 message: "Please fill in all fields."
             })
         }
-        const user = await User.findOne({ email }).select('+password')
+        const user = await User.findOne({ email }).select('+password');
         if (!user) {
             return res.status(401).json({
                 success: false,
                 message: "Invalid Credentials"
             })
         }
-        const isMatch = await user.comparePassword(password)
+        const isMatch = await user.comparePassword(password);
         if (!isMatch) {
             return res.status(401).json({
                 success: false,
@@ -140,7 +140,7 @@ exports.loginController = async (req, res) => {
             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
         })
 
-        await user.save()
+        await user.save();
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -170,7 +170,7 @@ exports.loginController = async (req, res) => {
 }
 exports.refreshToken = async (req, res) => {
     try {
-        const refreshToken = req.cookie?.refreshToken
+        const refreshToken = req.cookie?.refreshToken;
         if (!refreshToken) {
             return res.status(400).json({
                 success: false,
@@ -187,7 +187,7 @@ exports.refreshToken = async (req, res) => {
             }
         })
         if (!user) {
-            res.clearCookie(refreshToken)
+            res.clearCookie(refreshToken);
             return res.status(403).json({
                 success: false,
                 message: "Invalid session identity match tracking"
@@ -228,7 +228,7 @@ exports.refreshToken = async (req, res) => {
 }
 exports.logout = async (req, res) => {
     try {
-        const refreshToken = req.cookies.refreshToken
+        const refreshToken = req.cookies.refreshToken;
         if(!refreshToken){
             return res.status(204).send()
         }
@@ -238,7 +238,7 @@ exports.logout = async (req, res) => {
         })
         if(user){
             user.refreshToken = user.refreshToken.filter(rt => rt.token !== refreshToken)
-            await user.save()
+            await user.save();
         }
         res.clearCookie('refreshToken', {
             httpOnly: true,
@@ -259,15 +259,15 @@ exports.logout = async (req, res) => {
 }
 exports.logoutAll = async (req, res) => {
     try {
-        const user = await User.findById(req.user.id)
+        const user = await User.findById(req.user.id);
         if(!user){
             return res.status(404).json({
                 success: false,
                 message: 'User not found'
             })
         }
-        user.refreshToken  = []
-        await user.save()
+        user.refreshToken  = [];
+        await user.save();
         res.clearCookie('refreshToken', {
             httpOnly: true,
             secure: process.env.NODE_ENV == 'production',
@@ -285,9 +285,54 @@ exports.logoutAll = async (req, res) => {
         })
     }
 }
+//Vendor Register
 exports.registerVendor = async (req, res) => {
     try {
-        const validateData = req.body
+        const validateData = req.body;
+        const {name,email,password,phone,shopName,shopDescription,shopAddress,nidNumber,bankInfo} = validateData
+        //Check Duplicate
+        const existingVendor = await User.findOne({email});
+        if(existingVendor){
+            return res.status(409).json({
+                success: false,
+                message: "Vendor already exists with this email.Please login as a vendor."
+            })
+        }
+        //Check Duplicate NID
+        if(nidNumber){
+        const existingNID = await User.findOne({nidNumber});
+        if(existingNID){
+            return res.status(409).json({
+                success: false,
+                message: "Vendor already exists with this NID Number."
+            })
+        }
+        }
+        const vendor = new User({
+           name:name,
+           email:email,
+           password:password,
+           phone:phone,
+           role:'vendor',
+           shopName:shopName,
+           shopDescription:shopDescription,
+           shopAddress:shopAddress,
+           nidNumber:nidNumber,
+           bankInfo:bankInfo,
+           status:'pending' //auto set by pre-save
+        })
+        await vendor.save();
+        return res.status(201).json({
+            success: true,
+            message: "Vendor Registration Successfully Done",
+            vendor: {
+                id:vendor._id,
+                name:vendor.name,
+                email:vendor.email,
+                role:vendor.role,
+                status:vendor.status
+            }
+        })
     } catch (error) {
        console.error("Register Vendor Error:", error);
         return res.status(500).json({

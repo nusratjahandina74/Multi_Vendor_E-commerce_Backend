@@ -5,12 +5,13 @@ const {
     loginController, 
     refreshToken, 
     logout, 
-    logoutAll 
+    logoutAll,
+    registerVendor
 } = require('../controllers/authController');
 const { verifyEmail } = require('../controllers/verifyEmail');
 
 const validate = require('../middlewares/validateMiddleware');
-const { registrationSchema, loginSchema } = require('../validations/authValidation');
+const { registrationSchema, loginSchema, vendorSchema } = require('../validations/authValidation');
 const { registrationLimiter, loginLimiter, refreshLimiter } = require('../middlewares/rateLimiterMiddleware');
 const {protect} = require('../middlewares/authMiddleware'); 
 
@@ -268,5 +269,31 @@ router.post('/logout', logout);
  */
 
 router.post('/logoutall', protect, logoutAll); 
-
+/**
+ * @swagger
+ * /api/v1/auth/register-vendor:
+ *   post:
+ *     summary: Register a new vendor account
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/VendorRegisterInput'
+ *     responses:
+ *       201:
+ *         description: Vendor registered successfully, status is pending
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/VendorRegisterResponse'
+ *       400:
+ *         description: Input validation error
+ *       409:
+ *         description: Vendor already exists with this email or NID number
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/register-vendor', registrationLimiter, validate(vendorSchema), registerVendor)
 module.exports = router;

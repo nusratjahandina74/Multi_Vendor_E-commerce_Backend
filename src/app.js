@@ -4,6 +4,7 @@ const cors = require('cors');
 const swaggerUi = require('swagger-ui-express');
 const cookieParser = require('cookie-parser');
 const authRoutes = require('./routes/auth');
+const adminRoutes = require('./routes/admin');
 const dbConfig = require('./config/dbConfig');
 const swaggerSpecs = require('./config/swagger');
 const { apiLimiter } = require('./middlewares/rateLimiterMiddleware');
@@ -25,6 +26,7 @@ dbConfig();
 // Routes
 app.use('/api/v1', apiLimiter);
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/admin', adminRoutes);
 
 // Server Setup
 const PORT = process.env.PORT || 5000;
